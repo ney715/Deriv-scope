@@ -1,2 +1,1 @@
-# Deriv-scope
-analysis tool
+index.html
