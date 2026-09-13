@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DigitScope Pro — Deriv Analysis Dashboard</title>
+<style>
+:root{--bg:#07111f;--panel:#0d1a2b;--panel2:#101f33;--line:#20334d;--text:#eaf2ff;--muted:#8ea3bd;--good:#27d17f;--bad:#ff5d6c;--warn:#ffca57;--accent:#62a7ff}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#06101d,#0b1626);color:var(--text);font-family:Inter,system-ui,Arial,sans-serif}
+header{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:center;position:sticky;top:0;background:#081321ee;backdrop-filter:blur(12px);z-index:4}
+.brand{display:flex;gap:12px;align-items:center}.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#62a7ff,#8b6cff);display:grid;place-items:center;font-weight:900;color:white;box-shadow:0 8px 30px #0005}.brand h1{font-size:18px;margin:0}.brand small{color:var(--muted)}
+.status{display:flex;align-items:center;gap:8px;font-size:12px}.dot{width:9px;height:9px;border-radius:50%;background:var(--bad);box-shadow:0 0 10px currentColor}.online .dot{background:var(--good)}
+main{max-width:1400px;margin:auto;padding:18px}.controls,.grid{display:grid;gap:12px}.controls{grid-template-columns:1.2fr 1fr 1fr 1fr auto auto}.grid{grid-template-columns:repeat(12,1fr);margin-top:12px}.card{background:linear-gradient(180deg,#0d1a2b,#0a1727);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 10px 30px #0002}.controls .card{padding:10px}
+label{display:block;color:var(--muted);font-size:11px;margin-bottom:5px}select,input,button{width:100%;border:1px solid var(--line);border-radius:9px;background:#091626;color:var(--text);padding:10px;font:inherit}button{cursor:pointer;font-weight:700}.primary{background:#2d74db;border-color:#3d87f0}.danger{background:#7e2431}.secondary{background:#14263c}
+.kpi{grid-column:span 2}.kpi .value{font-size:25px;font-weight:800;margin-top:7px}.kpi .sub{font-size:11px;color:var(--muted);margin-top:3px}
+.chart{grid-column:span 8;min-height:380px}.side{grid-column:span 4}.wide{grid-column:span 12}.half{grid-column:span 6}
+canvas{width:100%;height:300px;background:#081422;border-radius:10px}
+.signal{display:grid;grid-template-columns:1fr 1fr;gap:10px}.signalBox{padding:15px;border:1px solid var(--line);border-radius:12px;text-align:center;background:#091726}.digit{font-size:54px;font-weight:900}.confidence{font-size:27px;font-weight:800}.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.bars{display:grid;grid-template-columns:repeat(10,1fr);gap:6px;align-items:end;height:160px}.barwrap{height:100%;display:flex;flex-direction:column;justify-content:end;align-items:center;gap:4px}.bar{width:100%;min-height:3px;border-radius:5px 5px 2px 2px;background:#4d8fe8}.barwrap span{font-size:10px;color:var(--muted)}.barwrap b{font-size:10px}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;padding:8px;border-bottom:1px solid #182941}th{color:var(--muted)}
+.pill{padding:4px 8px;border-radius:20px;font-size:10px;background:#14263c}.alert{padding:10px;border-left:3px solid var(--accent);background:#0b1b2d;border-radius:7px;margin:7px 0;font-size:12px}.footer{color:var(--muted);font-size:11px;padding:16px 0}
+@media(max-width:950px){.controls{grid-template-columns:1fr 1fr}.kpi,.chart,.side,.wide,.half{grid-column:span 12}.kpi{grid-column:span 6}}
+@media(max-width:560px){main{padding:10px}.controls{grid-template-columns:1fr}.kpi{grid-column:span 6}.chart,.side,.wide,.half{grid-column:span 12}.digit{font-size:42px}}
+
+/* V2 */
+.engine-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.engine-item{background:#091726;border:1px solid #1b2e47;border-radius:9px;padding:9px}.engine-item b{display:block;font-size:16px;margin-top:3px}.engine-item small{color:var(--muted);font-size:10px}
+.regime{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.tag{padding:5px 8px;border:1px solid var(--line);border-radius:20px;font-size:10px}.tag.on{border-color:var(--accent);background:#112b4a}
+.matrix{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-top:10px}.cell{padding:7px 2px;text-align:center;border-radius:6px;background:#0b1a2b;font-size:10px}.cell.hot{background:#173c62}.cell.cold{background:#241d2b}
+.confbar{height:8px;background:#081321;border-radius:99px;overflow:hidden;margin-top:7px}.confbar i{display:block;height:100%;background:#62a7ff;width:0}
+.badge2{display:inline-block;padding:5px 8px;border-radius:7px;background:#13243a;font-size:10px;margin:3px 2px}
+@media(max-width:950px){.engine-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">DS</div><div><h1>DigitScope Pro</h1><small>Deriv MATCH / DIFFER analysis dashboard</small></div></div>
+  <div id="status" class="status"><i class="dot"></i><span>Offline</span></div>
+</header>
+
+<main>
+<section class="controls">
+  <div class="card"><label>Market</label><select id="symbol"><option value="1HZ100V">Volatility 100 (1s)</option><option value="1HZ75V">Volatility 75 (1s)</option><option value="1HZ50V">Volatility 50 (1s)</option><option value="1HZ25V">Volatility 25 (1s)</option><option value="1HZ10V">Volatility 10 (1s)</option></select></div>
+  <div class="card"><label>Analysis window (ticks)</label><select id="window"><option>25</option><option selected>50</option><option>100</option><option>250</option><option>500</option></select></div>
+  <div class="card"><label>Minimum confidence</label><select id="threshold"><option value="55">55%</option><option value="60">60%</option><option selected value="65">65%</option><option value="70">70%</option><option value="75">75%</option><option value="80">80%</option></select></div>
+  <div class="card"><label>Scanner</label><select id="mode"><option value="continuous">Continuous</option><option value="manual">Manual</option></select></div>
+  <button class="primary" id="liveBtn">CONNECT LIVE</button>
+  <button class="secondary" id="testBtn">TEST FEED</button>
+  <button class="secondary" id="historyBtn">LOAD HISTORY</button>
+</section>
+
+<section class="grid">
+  <div class="card kpi"><label>Latest digit</label><div id="latest" class="value">—</div><div id="quote" class="sub">No ticks</div></div>
+  <div class="card kpi"><label>Predicted digit</label><div id="pred" class="value">—</div><div id="predType" class="sub">Waiting</div></div>
+  <div class="card kpi"><label>Predicted MATCH signal</label><div id="matchPred" class="value good">—</div><div id="matchPredSub" class="sub">MATCH candidate</div></div>
+  <div class="card kpi"><label>Predicted DIFFER signal</label><div id="differPred" class="value warn">—</div><div id="differPredSub" class="sub">DIFFER candidate</div></div>
+  <div class="card kpi"><label>Confidence</label><div id="conf" class="value">0%</div><div class="sub">Rule-based score</div></div>
+  <div class="card kpi"><label>Ticks scanned</label><div id="count" class="value">0</div><div class="sub">Current buffer</div></div>
+  <div class="card kpi"><label>Digit diversity</label><div id="diversity" class="value">0/10</div><div class="sub">Window coverage</div></div>
+  <div class="card kpi"><label>Scanner</label><div id="scanner" class="value">OFF</div><div class="sub">Alert gate</div></div>
+
+  <div class="card chart">
+    <label>Live tick chart</label>
+    <canvas id="chart"></canvas>
+  </div>
+
+  <div class="card side">
+    <label>Signal engine</label>
+    <div class="signal">
+      <div class="signalBox"><div class="sub">DIGIT</div><div id="signalDigit" class="digit">—</div></div>
+      <div class="signalBox"><div class="sub">MATCH / DIFFER</div><div id="signalType" class="confidence">WAIT</div></div>
+    </div>
+    <div style="margin-top:10px">
+      <div class="sub">Confidence components</div>
+      <table><tbody>
+        <tr><td>Frequency</td><td id="freqScore">0%</td></tr>
+        <tr><td>Recency</td><td id="recScore">0%</td></tr>
+        <tr><td>Streak / pressure</td><td id="streakScore">0%</td></tr>
+        <tr><td>Stability</td><td id="stableScore">0%</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+
+  <div class="card wide">
+    <label>V2 Prediction Engine — multi-model ensemble</label>
+    <div class="engine-grid">
+      <div class="engine-item"><small>Frequency model</small><b id="mFreq">0%</b><div class="confbar"><i id="bFreq"></i></div></div>
+      <div class="engine-item"><small>Recency model</small><b id="mRec">0%</b><div class="confbar"><i id="bRec"></i></div></div>
+      <div class="engine-item"><small>Transition model</small><b id="mTrans">0%</b><div class="confbar"><i id="bTrans"></i></div></div>
+      <div class="engine-item"><small>Run / streak model</small><b id="mRun">0%</b><div class="confbar"><i id="bRun"></i></div></div>
+    </div>
+    <div class="engine-grid">
+      <div class="engine-item"><small>Entropy filter</small><b id="mEntropy">0%</b></div>
+      <div class="engine-item"><small>Regime score</small><b id="mRegime">0%</b></div>
+      <div class="engine-item"><small>Ensemble confidence</small><b id="mEnsemble">0%</b></div>
+      <div class="engine-item"><small>Signal quality</small><b id="mQuality">WAIT</b></div>
+    </div>
+    <div class="regime"><span class="tag" id="rTrend">TREND: —</span><span class="tag" id="rVol">VOLATILITY: —</span><span class="tag" id="rEntropy">ENTROPY: —</span><span class="tag" id="rPressure">PRESSURE: —</span></div>
+  </div>
+
+  <div class="card half">
+    <label>Transition matrix — previous digit → next digit</label>
+    <div id="matrix" class="matrix"></div>
+  </div>
+
+  <div class="card half">
+    <label>Candidate ranking</label>
+    <table><thead><tr><th>Rank</th><th>Digit</th><th>Score</th><th>Reason</th></tr></thead><tbody id="candidates"></tbody></table>
+  </div>
+
+  <div class="card half">
+    <label>Digit distribution</label>
+    <div id="bars" class="bars"></div>
+  </div>
+
+  <div class="card half">
+    <label>Recent digits</label>
+    <div id="recent" style="font-size:22px;line-height:1.9;word-break:break-all;color:#d7e7ff">—</div>
+  </div>
+
+  <div class="card wide">
+    <label>Scanner alerts</label>
+    <div id="alerts"><div class="alert">Waiting for data. Connect to Deriv or press TEST FEED.</div></div>
+  </div>
+
+  <div class="card wide">
+    <label>Signal history</label>
+    <table><thead><tr><th>Time</th><th>Digit</th><th>Type</th><th>Confidence</th><th>Window</th><th>Status</th></tr></thead><tbody id="history"></tbody></table>
+  </div>
+
+  <div class="footer wide">
+    Analysis only: this dashboard does not guarantee future outcomes and does not automatically place trades. Live public tick data can be streamed without an account; authenticated trading is intentionally not enabled in this build.
+  </div>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+let ws=null, testTimer=null, ticks=[], prices=[], running=false, lastAlert=0, history=[];
+const canvas=$('chart'), ctx=canvas.getContext('2d');
+
+function setStatus(on,text){$('status').classList.toggle('online',on);$('status').querySelector('span').textContent=text}
+function digitFromQuote(q){ const s=String(q); const parts=s.split('.'); const frac=parts[1]||''; return Number(frac.slice(-1)||String(Math.abs(Math.round(q))%10)); }
+function clamp(x,a=0,b=100){return Math.max(a,Math.min(b,x))}
+function addAlert(text,kind=''){let el=document.createElement('div');el.className='alert';el.textContent=text;if(kind==='good')el.style.borderLeftColor='var(--good)';if(kind==='bad')el.style.borderLeftColor='var(--bad)';$('alerts').prepend(el);while($('alerts').children.length>8)$('alerts').lastChild.remove()}
+function draw(){
+  const dpr=devicePixelRatio||1,w=canvas.clientWidth,h=canvas.clientHeight;canvas.width=w*dpr;canvas.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h); if(prices.length<2)return;
+  let a=prices.slice(-100),min=Math.min(...a),max=Math.max(...a);if(max===min){max++;min--}
+  ctx.strokeStyle='#20334d';ctx.lineWidth=1;for(let i=1;i<5;i++){let y=i*h/5;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
+  ctx.strokeStyle='#62a7ff';ctx.lineWidth=2;ctx.beginPath();
+  a.forEach((v,i)=>{let x=i*(w-10)/(a.length-1)+5,y=h-8-(v-min)/(max-min)*(h-20);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke();
+}
+function analyze(){
+  const n=Number($('window').value), a=ticks.slice(-n); if(!a.length)return;
+  const counts=Array(10).fill(0); a.forEach(x=>counts[x]++);
+  const recent=a.slice(-Math.min(15,a.length)), last=a[a.length-1];
+  const prev=a.length>1?a[a.length-2]:last;
+
+  // First-order transition model: P(next digit | current digit), smoothed.
+  const trans=Array.from({length:10},()=>Array(10).fill(1));
+  for(let i=1;i<a.length;i++) trans[a[i-1]][a[i]]++;
+  const row=trans[last], rowSum=row.reduce((x,y)=>x+y,0);
+
+  // Run model: probability pressure changes as a digit persists.
+  let run=1; for(let i=a.length-2;i>=0&&a[i]===last;i--)run++;
+  const runPressure=clamp(48 + Math.min(32,run*7));
+
+  // Shannon entropy: low entropy means concentration; high entropy means noisy distribution.
+  const probs=counts.map(c=>c/Math.max(1,a.length)).filter(Boolean);
+  const entropy=-(probs.reduce((s,p)=>s+p*Math.log2(p),0))/Math.log2(10);
+  const entropyScore=clamp((1-entropy)*100);
+
+  // Recent-vs-window frequency.
+  const rcounts=Array(10).fill(0); recent.forEach(x=>rcounts[x]++);
+  // Volatility proxy from normalized absolute quote changes.
+  let vol=0;if(prices.length>5){let p=prices.slice(-Math.min(n,prices.length));let dif=[];for(let i=1;i<p.length;i++)dif.push(Math.abs(p[i]-p[i-1]));let mean=dif.reduce((s,x)=>s+x,0)/Math.max(1,dif.length);vol=clamp(mean/(Math.abs(p[p.length-1])*0.001+1e-9)*100)}
+  const trend=prices.length>8?(prices.at(-1)-prices[Math.max(0,prices.length-9)]>=0?1:-1):0;
+
+  const scores=Array(10).fill(0);
+  for(let d=0;d<10;d++){
+    const freq=counts[d]/Math.max(1,a.length)*100;
+    const rec=rcounts[d]/Math.max(1,recent.length)*100;
+    const tr=row[d]/rowSum*100;
+    const recencyDecay=recent.reduce((s,x,i)=>s+(x===d?(i+1):0),0)/(recent.length*(recent.length+1)/2)*100;
+    const balance=50 + (freq - 10)*1.5;
+    scores[d]=0.34*freq + 0.24*rec + 0.25*tr + 0.10*recencyDecay + 0.07*balance;
+  }
+
+  // Avoid overclaiming: normalize candidate scores into a comparative confidence.
+  const sorted=[...Array(10).keys()].sort((x,y)=>scores[y]-scores[x]);
+  const p=sorted[0], second=scores[sorted[1]]||0;
+  const raw=clamp(scores[p]*3.0);
+  const separation=clamp(50+(scores[p]-second)*4);
+  const ensemble=clamp(0.62*raw+0.23*separation+0.15*entropyScore);
+  const quality=ensemble>=Number($('threshold').value) && entropyScore>8 ? 'QUALIFIED':'WAIT';
+
+  const matchDigit=p;
+  const differDigit=sorted[sorted.length-1];
+  $('latest').textContent=last;$('pred').textContent=matchDigit;$('signalDigit').textContent=matchDigit;
+  $('matchPred').textContent=matchDigit;$('differPred').textContent=differDigit;
+  $('conf').textContent=Math.round(ensemble)+'%';$('count').textContent=a.length;
+  $('diversity').textContent=counts.filter(Boolean).length+'/10';
+  $('predType').textContent=quality==='QUALIFIED'?'MATCH SIGNAL READY':'No high-confidence setup';
+  $('signalType').textContent=quality==='QUALIFIED'?'MATCH':'WAIT';
+  $('signalType').className='confidence '+(quality==='QUALIFIED'?'good':'warn');
+  $('matchPredSub').textContent=quality==='QUALIFIED'?'MATCH predicted signal • '+Math.round(ensemble)+'%':'Below confidence threshold';
+  $('differPredSub').textContent='Lowest-frequency digit candidate';
+  $('scanner').textContent=(running&&quality==='QUALIFIED')?'ARMED':'WAIT';
+
+  $('freqScore').textContent=Math.round(counts[p]/a.length*100)+'%';
+  $('recScore').textContent=Math.round(rcounts[p]/recent.length*100)+'%';
+  $('streakScore').textContent=Math.round(runPressure)+'%';
+  $('stableScore').textContent=Math.round(separation)+'%';
+
+  $('mFreq').textContent=Math.round(counts[p]/a.length*100)+'%';$('bFreq').style.width=$('mFreq').textContent;
+  $('mRec').textContent=Math.round(rcounts[p]/recent.length*100)+'%';$('bRec').style.width=$('mRec').textContent;
+  $('mTrans').textContent=Math.round(row[p]/rowSum*100)+'%';$('bTrans').style.width=$('mTrans').textContent;
+  $('mRun').textContent=Math.round(runPressure)+'%';$('bRun').style.width=$('mRun').textContent;
+  $('mEntropy').textContent=Math.round(entropyScore)+'%';$('mRegime').textContent=Math.round(separation)+'%';
+  $('mEnsemble').textContent=Math.round(ensemble)+'%';$('mQuality').textContent=quality;
+  $('rTrend').textContent='TREND: '+(trend>0?'UP':trend<0?'DOWN':'FLAT');
+  $('rVol').textContent='VOLATILITY: '+(vol>65?'HIGH':vol>30?'MEDIUM':'LOW');
+  $('rEntropy').textContent='ENTROPY: '+(entropyScore>60?'LOW':'HIGH');
+  $('rPressure').textContent='PRESSURE: '+(run>2?'STREAK':'BALANCED');
+
+  $('recent').textContent=recent.join('  ');
+  const bars=$('bars');bars.innerHTML='';const mx=Math.max(1,...counts);
+  counts.forEach((c,d)=>{let w=document.createElement('div');w.className='barwrap';w.innerHTML=`<b>${c}</b><div class="bar" style="height:${Math.max(3,c/mx*120)}px"></div><span>${d}</span>`;bars.appendChild(w)});
+
+  const mat=$('matrix');mat.innerHTML='';for(let d=0;d<10;d++){let v=row[d]/rowSum*100;let el=document.createElement('div');el.className='cell '+(d===p?'hot':'');el.innerHTML=d+'<br>'+Math.round(v)+'%';mat.appendChild(el)}
+  $('candidates').innerHTML=sorted.slice(0,5).map((d,i)=>`<tr><td>${i+1}</td><td><b>${d}</b></td><td>${scores[d].toFixed(1)}</td><td>${d===p?'ensemble leader':(row[d]/rowSum*100>15?'transition support':'secondary')}</td></tr>`).join('');
+
+  draw();
+  if(running&&quality==='QUALIFIED'&&Date.now()-lastAlert>5000){
+    lastAlert=Date.now();
+    addAlert(`V2 QUALIFIED setup: digit ${p} — ensemble ${Math.round(ensemble)}%. This is a statistical filter, not a guarantee.`,'good');
+    history.unshift({time:new Date().toLocaleTimeString(),digit:p,type:'DIFFER',conf:Math.round(ensemble),window:a.length,status:'V2 QUALIFIED'});
+    renderHistory();
+  }
+}
+
+function pushTick(q){
+  const d=digitFromQuote(q);ticks.push(d);prices.push(Number(q));const max=Number($('window').value)*4;if(ticks.length>max)ticks.shift();if(prices.length>max)prices.shift();
+  $('latest').textContent=d;$('quote').textContent=Number(q).toFixed(Math.min(8, String(q).split('.')[1]?.length||2));analyze();
+}
+function renderHistory(){ $('history').innerHTML=history.slice(0,25).map(x=>`<tr><td>${x.time}</td><td>${x.digit}</td><td>${x.type}</td><td>${x.conf}%</td><td>${x.window}</td><td><span class="pill">${x.status}</span></td></tr>`).join('') }
+
+function stopTest(){if(testTimer){clearInterval(testTimer);testTimer=null}}
+function startTest(){
+  stopLive();stopTest();running=true;setStatus(true,'TEST FEED');addAlert('Test feed started. No Deriv account or money is used.');let base=1000+Math.random()*20;
+  testTimer=setInterval(()=>{base+=((Math.random()-.48)*3);let q=base.toFixed(2+Math.floor(Math.random()*3));pushTick(q)},700)
+}
+function stopLive(){if(ws){try{ws.close()}catch(e){}ws=null}}
+function startLive(){
+  stopTest();stopLive();running=true;setStatus(false,'Connecting…');
+  const urls=['wss://api.derivws.com/trading/v1/options/ws/public','wss://ws.binaryws.com/websockets/v3'];
+  let idx=0;
+  function connect(){
+    try{ws=new WebSocket(urls[idx])}catch(e){if(idx<urls.length-1){idx++;connect()}else setStatus(false,'Connection error');return}
+    ws.onopen=()=>{setStatus(true,'LIVE DERIV');ws.send(JSON.stringify({ticks:$('symbol').value,subscribe:1,req_id:1}))};
+    ws.onmessage=e=>{try{let x=JSON.parse(e.data);if(x.msg_type==='tick'&&x.tick){pushTick(x.tick.quote)}}catch(err){}};
+    ws.onerror=()=>{setStatus(false,'Feed error')};
+    ws.onclose=()=>{if(running&&idx<urls.length-1){idx++;setTimeout(connect,800)}else if(running)setStatus(false,'Disconnected')};
+  }connect();
+}
+$('liveBtn').onclick=()=>startLive();
+$('testBtn').onclick=()=>startTest();
+$('symbol').onchange=()=>{if(running&&!testTimer)startLive()};
+$('window').onchange=analyze;$('threshold').onchange=analyze;$('mode').onchange=e=>{running=e.target.value==='continuous';analyze()};
+
+function loadHistory(){
+  stopTest();stopLive();running=false;setStatus(false,'LOADING HISTORY');
+  const u='wss://api.derivws.com/trading/v1/options/ws/public';
+  try{
+    ws=new WebSocket(u);
+    ws.onopen=()=>{ws.send(JSON.stringify({ticks_history:$('symbol').value,adjust_start_time:1,count:Math.max(100,Number($('window').value)*3),end:'latest',start:1,style:'ticks',req_id:77}))};
+    ws.onmessage=e=>{try{let x=JSON.parse(e.data);if(x.msg_type==='history'&&x.history?.prices){ticks=[];prices=[];x.history.prices.forEach(q=>{prices.push(Number(q));ticks.push(digitFromQuote(q))});setStatus(true,'HISTORY LOADED');analyze();addAlert(`Loaded ${ticks.length} historical ticks for model warm-up.`)}}catch(err){}};
+    ws.onerror=()=>setStatus(false,'History error');
+  }catch(e){setStatus(false,'History error')}
+}
+$('historyBtn').onclick=loadHistory;
+
+window.onresize=draw; analyze();
+</script>
+</body>
+</html>
